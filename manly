@@ -1,0 +1,50 @@
+#!/usr/bin/perl
+use strict;
+use warnings;
+
+my ($binary, $search_term) = @ARGV;
+my @output;
+
+use constant {
+	STATE_NOT_FOUND => 1,
+	STATE_IN_FOUND => 2
+};
+
+my $state = STATE_NOT_FOUND;
+my $header_indentation;
+my $fuzz = 2;
+my @manpage = qx{man $binary};
+foreach my $line (@manpage) {
+	my $indentation;
+	if ($state == STATE_NOT_FOUND) {
+		my $option;
+		($indentation,$option) =
+			($line =~ m/^(\s+)($search_term)/);
+		next if !defined $option || $option ne $search_term;
+		#Found beginning:
+		$header_indentation = length($indentation);
+		$line =~ s/\s+$//g;
+		push @output, $line;
+#		print "Header Indent length is $header_indentation\n";
+		$state = STATE_IN_FOUND;
+		next;
+	} else {
+		#Check to see if we haven't chanced upon a new option yet
+		if ($line =~ m/^\s+$/) {
+			push @output, "";
+			next;
+		}
+		($indentation,undef) = ($line =~ m/(^\s+)(.+)/);
+		my $indent_length = length($indentation);
+#		printf("Indent length is %d\n", $indent_length);
+
+		if (($indent_length) <= $header_indentation) {
+			last;
+		}
+
+		$line =~ s/\s+$//g;
+		push @output, $line;
+	}
+}
+
+print join("\n", @output) . "\n";
